@@ -18,7 +18,7 @@
   "resources": [
     {
       "name": "boost_paraguay_-_municipalities_expenditure_v_1.1_2006-2013_en_0",
-      "url": "http://localhost:8080/dist/boost_paraguay.csv",
+      "url": "boost_paraguay.csv",
       "format": "csv",
       "mediatype": "text/csv",
       "bytes": 9065524,
