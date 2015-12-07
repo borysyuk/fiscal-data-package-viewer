@@ -1,0 +1,138 @@
+{
+  "name": "gastos_v40_2012-2015",
+  "title": "gastos_v40_2012-2015",
+  "resources": [
+    {
+      "name": "gastos_v40_2012-2015",
+      "format": "csv",
+      "url": "http://localhost:8080/dist/gastos_v40_2012-2015.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "AÑO",
+            "title": "Año",
+            "description": "",
+            "type": "integer",
+            "format": "default"
+          },
+          {
+            "name": "CENTRO",
+            "title": "Centro",
+            "description": "",
+            "type": "integer",
+            "format": "default"
+          },
+          {
+            "name": "DESCRIPCION CENTRO",
+            "title": "Descripcion Centro",
+            "description": "",
+            "type": "string",
+            "format": "default"
+          },
+          {
+            "name": "SECCION",
+            "title": "Seccion",
+            "description": "",
+            "type": "integer",
+            "format": "default"
+          },
+          {
+            "name": "DESCRIPCION SECCION",
+            "title": "Descripcion Seccion",
+            "description": "",
+            "type": "string",
+            "format": "default"
+          },
+          {
+            "name": "PROGRAMA",
+            "title": "Programa",
+            "description": "",
+            "type": "integer",
+            "format": "default"
+          },
+          {
+            "name": "DESCRIPCION PROGRAMA",
+            "title": "Descripcion Programa",
+            "description": "",
+            "type": "string",
+            "format": "default"
+          },
+          {
+            "name": "CAPITULO",
+            "title": "Capitulo",
+            "description": "",
+            "type": "integer",
+            "format": "default"
+          },
+          {
+            "name": "DESCRIPCION CAPITULO",
+            "title": "Descripcion Capitulo",
+            "description": "",
+            "type": "string",
+            "format": "default"
+          },
+          {
+            "name": "ECONOMICO",
+            "title": "Economico",
+            "description": "",
+            "type": "integer",
+            "format": "default"
+          },
+          {
+            "name": "DESCRIPCION ECONOMICO",
+            "title": "Descripcion Economico",
+            "description": "",
+            "type": "string",
+            "format": "default"
+          },
+          {
+            "name": "IMPORTE",
+            "title": "Importe",
+            "description": "",
+            "type": "number",
+            "format": "default"
+          }
+        ]
+      }
+    }
+  ],
+  "mapping": {
+    "measures": [
+      {
+        "name": "amount",
+        "source": "IMPORTE",
+        "resource": "gastos_v40_2012-2015",
+        "currency": "EUR"
+      }
+    ],
+    "dimensions": [
+      {
+        "name": "datetime",
+        "dimensionType": "datetime",
+        "fields": [
+          {
+            "name": "AÑO",
+            "source": "AÑO",
+            "resource": "gastos_v40_2012-2015"
+          }
+        ]
+      },
+      {
+        "name": "classification",
+        "dimensionType": "classification",
+        "fields": [
+          {
+            "name": "PROGRAMA",
+            "source": "PROGRAMA",
+            "resource": "gastos_v40_2012-2015"
+          },
+          {
+            "name": "ECONOMICO",
+            "source": "ECONOMICO",
+            "resource": "gastos_v40_2012-2015"
+          }
+        ]
+      }
+    ]
+  }
+}
