@@ -1,19 +1,19 @@
 import React, { Component } from 'react';
 import { Row, Col, ButtonGroup, Button, Tabs, Tab } from 'react-bootstrap';
-import { Treemap, Table, Pie } from '../views';
+import { Treemap, Table, Pie, BubbleTree } from '../views';
 import _ from 'lodash';
 
 class Views extends Component {
   render() {
-    const { data, headers, ui } = this.props;
+    const { data, headers, ui, actions } = this.props;
     return (
       <Row>
         <Col xs={12} md={12}>
           <h2>
             Views
             <ButtonGroup className='pull-right'>
-              <Button className='fa fa-arrow-left' />
-              <Button className='fa fa-arrow-right' />
+              <Button className='fa fa-arrow-left' onClick={(event) => actions.undo()} disabled={this.props.undoDisabled} />
+              <Button className='fa fa-arrow-right' onClick={(event) => actions.redo()} disabled={this.props.redoDisabled} />
             </ButtonGroup>
           </h2>
         </Col>
@@ -28,6 +28,11 @@ class Views extends Component {
             <Tab eventKey={2} title="Treemap">
               <div className="margin-top-8">
                 <Treemap data={ data } ui={ ui } />
+              </div>
+            </Tab>
+            <Tab eventKey={3} title="Bubble Tree">
+              <div className="margin-top-8">
+                <BubbleTree />
               </div>
             </Tab>
           </Tabs>

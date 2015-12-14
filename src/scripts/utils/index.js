@@ -1,4 +1,5 @@
 import _ from 'lodash'
+import { ActionCreators } from 'redux-undo'
 import { actions, loaders } from 'fiscaldata-js';
 
 export const chartDataMappers = {};
@@ -78,11 +79,15 @@ export function bindActions(dispatch) {
 
   result.loadFiscalDataPackage = function(url) {
     dispatch(actions.resetStateTree());
+    dispatch(actions.fdpLoading());
     loaders.fdp(url, {}, {
-      proxy: 'http://gobetween.oklabs.org/pipe/{url}'
+      proxy: 'http://gobetween.oklabs.org/pipe/{url}',
+      onMetaInfoLoaded: (meta) => {
+        dispatch(actions.fdpMetaInfoLoaded(meta))
+      }
     }).then(function(data) {
-      dispatch(actions.setDefaultUi(data.ui));
-      dispatch(actions.setDefaultData(data.data));
+      dispatch(actions.setDefaultState(data));
+      dispatch(actions.fdpLoaded());
     });
   };
 
@@ -102,6 +107,14 @@ export function bindActions(dispatch) {
     let groups = {};
     groups[fieldName] = !!isSelected;
     dispatch(actions.setGroupField(groups));
+  };
+
+  result.undo = function() {
+    dispatch(ActionCreators.undo());
+  };
+
+  result.redo = function() {
+    dispatch(ActionCreators.redo());
   };
 
   return result;
