@@ -6,8 +6,8 @@
   angular.module('Application')
     .controller(
       'main',
-      ['$scope', '$rootScope', 'NavigationService', '_', 'ApiService', 'HistoryService', '$q', '$timeout', 'SettingsService',
-        function ($scope, $rootScope, NavigationService, _, ApiService, HistoryService, $q, $timeout, SettingsService) {
+      ['$scope', 'NavigationService', '_', 'ApiService', 'HistoryService', '$q', '$timeout',
+        function ($scope, NavigationService, _, ApiService, HistoryService, $q, $timeout) {
 
           function initScopeEvents(){
             $scope.events = {};
