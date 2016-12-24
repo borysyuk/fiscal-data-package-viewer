@@ -1,403 +1,291 @@
-;(function(angular) {
+'use strict';
 
-  var components = require('components');
-  var viewerService = {};
+var _ = require('lodash');
+var angular = require('angular');
 
-  angular.module('Application')
-    .controller(
-      'main',
-      ['$scope',
-        '$rootScope',
-        'NavigationService',
-        '_',
-        'HistoryService',
-        '$q',
-        '$timeout',
-        'SettingsService',
-        '$window',
+var ngUtils = require('../services/ng-utils');
+var $q = ngUtils.$q;
+var $digest = ngUtils.$digest;
+var osViewerService = require('../services/os-viewer');
+var dataPackageApiService = require('../services/data-package-api');
 
-        function($scope,
-          $rootScope,
-          NavigationService,
-          _,
-          HistoryService,
-          $q,
-          $timeout,
-          SettingsService,
-          $window) {
+angular.module('Application')
+  .controller('MainController', [
+    '$scope', '$location', '$window', '$timeout', 'Configuration',
+    'LoginService', 'i18nFilter',
+    function(
+      $scope, $location, $window, $timeout, Configuration,
+      LoginService, i18n
+    ) {
+      // Flag for skipping `$locationChangeSuccess` event when
+      // it is triggered while updating url
+      var isChangingUrl = false;
 
-          function updateLocation() {
-            NavigationService.updateLocation($scope.state, $rootScope.isEmbedded);
-          }
+      // This function should be called before updating $scope.state.params
+      function updateStateParams(newParams, updateHistory, updateUrl) {
+        updateHistory = _.isUndefined(updateHistory) || !!updateHistory;
+        updateUrl = _.isUndefined(updateUrl) || !!updateUrl;
+        var isEmbedded = $scope.isEmbedded;
 
-          function initScopeEvents() {
-            $scope.events = {};
+        // Remove all items after current and then store current
+        if (updateHistory && !isEmbedded) {
+          osViewerService.history.trim($scope.state);
+        }
+        $scope.state.params = newParams;
 
-            $scope.$on('treemap-click',
-              function(event, treeMapComponent, info) {
-                var dimension = _.find(
-                  $scope.state.dimensions.items, {
-                    key: _.first($scope.state.dimensions.current.groups)
-                  });
+        // Extend state with some UI-related data
+        $scope.state.params.isEmbedded = isEmbedded;
+        $scope.state.params.availableSoring = osViewerService
+          .getAvailableSorting($scope.state);
+        $scope.state.params.breadcrumbs = osViewerService
+          .buildBreadcrumbs($scope.state);
+        $scope.state.params.currencySign = osViewerService
+          .getCurrencySign($scope.state);
+        $scope.state.params.selectedFilters = osViewerService
+          .getSelectedFilters($scope.state);
 
-                if (dimension && dimension.drillDown) {
-                  $scope.state.dimensions.current.groups = [
-                    dimension.drillDown
-                  ];
-                  var item = _.find(dimension.values, {key: info._key});
-                  if (item) {
-                    $scope.state.dimensions.current.filters[dimension.key] =
-                      item.key;
-                  }
-                  updateLocation();
-                  updateBabbage();
+        if (updateHistory && !isEmbedded) {
+          osViewerService.history.push($scope.state);
+        }
+
+        // Update page URL; set flag to skip nearest location change event
+        if (updateUrl && !isEmbedded) {
+          isChangingUrl = true;
+          $location.url(osViewerService.buildUrl($scope.state.params));
+        }
+
+        // Trigger digest safely - $digest is not triggered
+        // when processing events
+        $digest();
+      }
+
+      function updateFilterValues() {
+        $scope.state.params.isFiltersUpdating = true;
+        $q(osViewerService.fullyPopulateModel($scope.state))
+          .then(function() {
+            $scope.state.params.selectedFilters = osViewerService
+              .getSelectedFilters($scope.state);
+            $scope.state.params.isFiltersUpdating = false;
+          });
+      }
+
+      // Initialization stuff
+      function initRegular() {
+        $q(LoginService.tryGetToken())
+          .then(function(token) {
+            var userId = token ? LoginService.getUserId() : null;
+            var urlParams = osViewerService.parseUrl($location.url());
+            var packageId = urlParams.packageId;
+
+            return $q(osViewerService.loadDataPackages(
+              token, packageId, userId
+            ))
+              .then(function(dataPackages) {
+                // If user is not logged in, and there are no package ID in
+                // url - no data packages will be loaded.
+                // In this case, redirect user to OS Explorer
+                if (!_.isArray(dataPackages) || (dataPackages.length == 0)) {
+                  $window.location.href = dataPackageApiService.osExplorerUrl;
                 }
+                return dataPackages;
               });
+          })
+          .then(function(dataPackages) {
+            $scope.isLoading.application = false;
+            $scope.availablePackages = dataPackages;
 
-            $scope.events.changePackage = function(packageNameIndex) {
-              changePackage(packageNameIndex);
-            };
+            $scope.isLoading.package = true;
+            return $q(osViewerService.getInitialState(dataPackages,
+              $location.url()));
+          })
+          .then(function(state) {
+            osViewerService.translateHierarchies(state, i18n);
+            $scope.state = state;
+            return $q(osViewerService.fullyPopulateModel(state));
+          })
+          .then(function(state) {
+            $scope.state = state;
+            updateStateParams(state.params);
+            $scope.isLoading.package = false;
+          });
+      }
 
-            $scope.events.changeMeasure = function(measure) {
-              $scope.state.measures.current = measure;
-              updateLocation();
-              updateBabbage();
-            };
-            $scope.events.findDimension = function(key) {
-              return _.find($scope.state.dimensions.items, {key: key});
-            };
+      function initEmbedded() {
+        $scope.isLoading.application = false;
+        $scope.isLoading.package = true;
 
-            $scope.events.isGroupSelected = function(key) {
-              return $scope.state.dimensions.current.groups.indexOf(key) >= 0;
-            };
+        var urlParams = osViewerService.parseUrl($location.url());
 
-            $scope.events.isFilterSelected = function(key) {
-              return !_.isUndefined(
-                $scope.state.dimensions.current.filters[key]
-              );
-            };
-
-            $scope.events.getSelectedValue = function(dimension) {
-              var valueKey =
-                $scope.state.dimensions.current.filters[dimension.key];
-
-              var result = _.find(dimension.values, function(item) {
-                return item.key == valueKey;
-              });
-              if (result) {
-                return result.value;
-              } else {
-                return '';
-              }
-            };
-
-            $scope.events.changeGroup = function(group, dropFilters) {
-              var index = $scope.state.dimensions.current.groups.indexOf(group);
-              if (index > -1) {
-                if ($scope.state.dimensions.current.groups.length > 1) {
-                  $scope.state.dimensions.current.groups.splice(index, 1);
-                }
-              } else {
-                //babbage.ui doesn't support multy-drilldown
-                //$scope.state.dimensions.current.groups.push(group);
-                $scope.state.dimensions.current.groups = [group];
-              }
-              if (!!dropFilters) {
-                $scope.state.dimensions.current.filters = {};
-              }
-              updateLocation();
-              updateBabbage();
-            };
-
-            $scope.events.changeFilter = function(filter, value) {
-              $scope.state.dimensions.current.filters[filter] = value;
-              updateLocation();
-              updateBabbage();
-            };
-            $scope.events.dropFilter = function(filter) {
-              delete $scope.state.dimensions.current.filters[filter];
-              updateLocation();
-              updateBabbage();
-            };
-
-            $scope.events.changePivot = function(axis, dimension, replace) {
-              var current = $scope.state.dimensions.current;
-              if (!replace) {
-                var isSelected = _.find(current[axis], function(item) {
-                  return item == dimension;
+        $q(osViewerService.loadDataPackage(urlParams.packageId, urlParams))
+          .then(function(state) {
+            osViewerService.translateHierarchies(state, i18n);
+            $scope.state = state;
+            if (osViewerService.hasDrillDownVisualizations(state.params)) {
+              $q(osViewerService.partiallyPopulateModel(state))
+                .then(function() {
+                  updateStateParams($scope.state.params);
                 });
-                if (!isSelected) {
-                  current[axis].push(dimension);
-                }
-              } else {
-                current[axis] = [dimension];
-              }
-
-              updateLocation();
-              updateBabbage();
-            };
-            $scope.events.dropPivot = function(axis, dimension) {
-              var current = $scope.state.dimensions.current;
-              current[axis] = _.filter(current[axis], function(item) {
-                return item != dimension;
-              });
-              updateLocation();
-              updateBabbage();
-            };
-
-            $scope.events.canBack = function() {
-              return HistoryService.canBack();
-            };
-            $scope.events.canForward = function() {
-              return HistoryService.canForward();
-            };
-            $scope.events.back = function() {
-              var history = HistoryService.back();
-              setState(history);
-            };
-            $scope.events.forward = function() {
-              var history = HistoryService.forward();
-              setState(history);
-            };
-          }
-
-          function refreshBabbageComponents() {
-            $timeout(function() {
-              $scope.state.flag.renderingCharts = true;
-              $timeout(function() {
-                $scope.state.flag.renderingCharts = false;
-              });
-            });
-          }
-
-          function setState(state) {
-            $scope.state = _.extend($scope.state, state);
-            updateLocation();
-            refreshBabbageComponents();
-          }
-
-          function chooseStateParams(defaultParams) {
-            //validate and populate default params
-            $scope.state.measures.current = '';
-            $scope.state.dimensions.current.groups = [];
-            $scope.state.dimensions.current.rows = [];
-            $scope.state.dimensions.current.columns = [];
-            $scope.state.dimensions.current.filters = {};
-
-            // Measures
-            if (_.find($scope.state.measures.items, {
-                key: defaultParams.measure
-              })) {
-              $scope.state.measures.current = defaultParams.measure;
             }
+            return state;
+          })
+          .then(function(state) {
+            $scope.isLoading.package = false;
+            $scope.state = state;
+            updateStateParams(state.params);
+          });
+      }
 
-            // Groups
-            _.forEach(defaultParams.groups, function(value) {
-              var dimension = $scope.events.findDimension(value);
-              if (dimension) {
-                $scope.state.dimensions.current.groups.push(value);
-              }
-            });
+      // Wait for one digest cycle before check `$scope.isEmbedded`
+      // since `ng-init` is executed after `ng-controller`
+      $timeout(function() {
+        $scope.isEmbedded ? initEmbedded() : initRegular();
+        osViewerService.theme.set($scope.theme);
+      });
 
-            // Rows
-            _.forEach(defaultParams.rows, function(value) {
-              var dimension = $scope.events.findDimension(value);
-              if (dimension) {
-                $scope.state.dimensions.current.rows.push(value);
-              }
-            });
+      // Update filer values based on current filters
+      $scope.$watch('state.params.filters', function(newValue, oldValue) {
+        if (newValue !== oldValue) {
+          updateFilterValues();
+        }
+      }, true);
+      $scope.$watch('state.params.drilldown', function(newValue, oldValue) {
+        if (newValue !== oldValue) {
+          updateFilterValues();
+        }
+      }, true);
 
-            // Columns
-            _.forEach(defaultParams.columns, function(value) {
-              var dimension = $scope.events.findDimension(value);
-              if (dimension) {
-                $scope.state.dimensions.current.columns.push(value);
-              }
-            });
+      // Event listeners
 
-            // Filters
-            _.forEach(defaultParams.filters, function(value, key) {
-              var dimension = $scope.events.findDimension(key);
-              if (dimension) {
-                $scope.state.dimensions.current.filters[key] = value;
-              }
-            });
+      // History events
+      $scope.$on(Configuration.events.history.back, function() {
+        osViewerService.history.back($scope.state);
+      });
+      $scope.$on(Configuration.events.history.forward, function() {
+        osViewerService.history.forward($scope.state);
+      });
+
+      // Location change event
+      $scope.$on('$locationChangeSuccess', function($event, newUrl, oldUrl) {
+        var wasChangingUrl = isChangingUrl;
+        isChangingUrl = false;
+        if ((newUrl != oldUrl) && !wasChangingUrl) {
+          var urlParams = osViewerService.parseUrl(newUrl);
+          $scope.$emit(Configuration.events.packageSelector.change,
+            urlParams.packageId, newUrl);
+        }
+      });
+
+      // Package selector events
+      $scope.$on(Configuration.events.packageSelector.change,
+        function($event, packageId, url) {
+          // `url` is optional and passed only  from
+          // `$locationChangeSuccess` event handler
+          if (!packageId) {
+            return;
           }
 
-          function changePackage(packageName, defaultParams) {
-            defaultParams = defaultParams || {};
-            $scope.state.isPackageLoading = true;
-            $scope.state.availablePackages.current = packageName;
-
-            $q(function(resolve, reject) {
-              viewerService.getPackageInfo(packageName)
-                .then(resolve)
-                .catch(reject);
-            }).then(function(packageInfo) {
-              $scope.dataPackageInfo = packageInfo;
-
-              $scope.state.availablePackages.description =
-                packageInfo.description;
-
-              $scope.state.availablePackages.title = packageInfo.title;
-
-              $scope.state.availablePackages.locationCountry =
-                _.isArray(packageInfo.countryCode) ?
-                  _.first(packageInfo.countryCode) : packageInfo.countryCode;
-              $scope.state.availablePackages.locationAvailable = false;
-            });
-
-            $q(function(resolve, reject) {
-              viewerService.buildState(packageName)
-                .then(resolve)
-                .catch(reject);
-            }).then(function(state) {
-              $scope.state.dimensions.items = state.dimensions.items;
-              $scope.state.measures.items = state.measures.items;
-              $scope.state.hierarchies = state.hierarchies;
-              chooseStateParams(defaultParams);
-
-              // Measures
-              if (!$scope.state.measures.current) {
-                $scope.state.measures.current = state.measures.current;
-              }
-
-              // Groups
-              if ($scope.state.dimensions.current.groups.length == 0) {
-                $scope.state.dimensions.current.groups = [
-                  _.first(
-                    _.first(state.hierarchies).dimensions
-                  ).key];
-              }
-
-              // Rows
-              if ($scope.state.dimensions.current.rows.length == 0) {
-                $scope.state.dimensions.current.rows = [
-                  _.first(
-                    _.first(state.hierarchies).dimensions
-                  ).key];
-              }
-              // Rows
-              if ($scope.state.dimensions.current.columns.length == 0) {
-                $scope.state.dimensions.current.columns = [
-                  _.first(
-                    _.first(state.hierarchies).dimensions
-                  ).key];
-              }
-
-              $scope.state.availablePackages.locationAvailable =
-                !!$scope.state.availablePackages.locationCountry && !!_.find(state.dimensions.items, {
-                  dimensionType: 'location'
-                });
-              $scope.state.availablePackages.locationSelected = false;
-            }).finally(function() {
-              $scope.state.isPackageLoading = false;
-              updateBabbage();
-              updateLocation();
-            });
-          }
-
-          function updateBabbage() {
-            var cut = _.map(
-              $scope.state.dimensions.current.filters,
-              function(value, key) {
-                return key + ':"' + value + '"';
-              });
-
-            $scope.state.babbage = {
-              aggregates: $scope.state.measures.current,
-              group: [_.first($scope.state.dimensions.current.groups)],
-              filter: cut
-            };
-
-            $scope.state.babbagePivot = {
-              aggregates: $scope.state.measures.current,
-              rows: $scope.state.dimensions.current.rows,
-              cols: $scope.state.dimensions.current.columns,
-              filter: cut
-            };
-
-            HistoryService.pushState($scope.state);
-
-            refreshBabbageComponents();
-          }
-
-          function applyLocationParams() {
-            var params = NavigationService.getParams();
-            if (
-              !_.find($scope.state.availablePackages.items, {
-                key: params.dataPackage
+          var isUrlAvailable = !!url;
+          var urlParams = osViewerService.parseUrl(url);
+          if (!$scope.state || (packageId != $scope.state.package.id)) {
+            $scope.isLoading.package = true;
+            $q(osViewerService.loadDataPackage(packageId, urlParams))
+              .then(function(state) {
+                state.params.lang = $scope.state.params.lang;
+                state.params.theme = $scope.state.params.theme;
+                $scope.state = state;
+                osViewerService.translateHierarchies(state, i18n);
+                return $q(osViewerService.fullyPopulateModel(state));
               })
-            ) {
-              params.dataPackage =
-                _.first($scope.state.availablePackages.items).key;
-            }
-
-            if (params.dataPackage !== $scope.state.availablePackages.current) {
-              $timeout(changePackage(params.dataPackage, params));
-            } else {
-              chooseStateParams(params);
-              updateBabbage();
+              .then(function(state) {
+                $scope.isLoading.package = false;
+                $scope.state = state;
+                // Do not update url and history when populating data from url
+                updateStateParams(state.params, !isUrlAvailable,
+                  !isUrlAvailable);
+              });
+          } else {
+            if (isUrlAvailable) {
+              updateStateParams(osViewerService.params.updateFromParams(
+                $scope.state.params, urlParams, $scope.state.package),
+                false, false);
             }
           }
+        });
 
-          $rootScope.isEmbedded = $window.isEmbedded;
+      // Visualizations events
+      $scope.$on(Configuration.events.visualizations.add,
+        function($event, visualizationId, toggle) {
+          updateStateParams(osViewerService.params.addVisualization(
+            $scope.state.params, visualizationId, toggle,
+            $scope.state.package));
+        });
 
-          $scope.$watch('state.dimensions.current.groups', function(value) {
-            if ($scope.state && $scope.state.availablePackages) {
-              var currentGroup = _.find($scope.state.dimensions.items, {
-                key: _.first(value)
-              });
-              $scope.state.availablePackages.locationSelected =
-                _.isObject(currentGroup) &&
-                (currentGroup.dimensionType == 'location');
-            }
-          });
+      $scope.$on(Configuration.events.visualizations.remove,
+        function($event, visualizationId) {
+          updateStateParams(osViewerService.params.removeVisualization(
+            $scope.state.params, visualizationId, $scope.state.package));
+        });
 
-          $scope.$watch('state.measures.current', function(value) {
-            if ($scope.state && $scope.state.availablePackages) {
-              var currentMeasure = _.find($scope.state.measures.items, {
-                key: value
-              });
+      $scope.$on(Configuration.events.visualizations.removeAll,
+        function() {
+          updateStateParams(osViewerService.params
+            .removeAllVisualizations($scope.state.params,
+              $scope.state.package));
+        });
 
-              $scope.state.availablePackages.currencySign =
-                _.isObject(currentMeasure) ? currentMeasure.currency : null;
-            }
-          });
+      $scope.$on(Configuration.events.visualizations.drillDown,
+        function($event, drillDownValue) {
+          updateStateParams(osViewerService.params
+            .drillDown($scope.state.params, drillDownValue,
+              $scope.state.package));
+        });
 
-          $scope.$on('$locationChangeSuccess',
-            function(angularEvent, newUrl, oldUrl) {
-              if (NavigationService.isChanging()) {
-                NavigationService.changed();
-                return;
-              }
-              if ((newUrl == oldUrl)) {
-                return;
-              }
-              applyLocationParams();
-            });
+      $scope.$on(Configuration.events.visualizations.breadcrumbClick,
+        function($event, breadcrumb) {
+          updateStateParams(osViewerService.params
+            .applyBreadcrumb($scope.state.params, breadcrumb,
+              $scope.state.package));
+        });
 
-          function init() {
-            $scope.state = {};
-            $scope.state.isStarting = true;
+      $scope.$on(Configuration.events.visualizations.changeOrderBy,
+        function($event, key, direction) {
+          updateStateParams(osViewerService.params
+            .changeOrderBy($scope.state.params, key, direction));
+        });
 
-            return SettingsService.get('api').then(function(apiSettings) {
-              $scope.state.apiUrl = apiSettings.url;
-              $scope.state.cosmoUrl = apiSettings.cosmoUrl;
-              viewerService = components.osViewerService(apiSettings);
-              return $q(function(resolve, reject) {
-                viewerService.start({}).then(function(state) {
-                  resolve(state);
-                });
-              });
-            });
-          };
+      // Sidebar events
+      $scope.$on(Configuration.events.sidebar.changeMeasure,
+        function($event, key) {
+          updateStateParams(osViewerService.params
+            .changeMeasure($scope.state.params, key));
+        });
 
-          init().then(function(state) {
-            $scope.state = _.extend($scope.state, state);
-            applyLocationParams();
-          });
+      $scope.$on(Configuration.events.sidebar.changeDimension,
+        function($event, axis, key) {
+          updateStateParams($scope.state.params = osViewerService.params
+            .changeDimension($scope.state.params, axis, key,
+              $scope.state.package));
+        });
 
-          initScopeEvents();
-        }]);
-})(angular);
+      $scope.$on(Configuration.events.sidebar.clearDimension,
+        function($event, axis, key) {
+          updateStateParams($scope.state.params = osViewerService.params
+            .clearDimension($scope.state.params, axis, key,
+              $scope.state.package));
+        });
+
+      $scope.$on(Configuration.events.sidebar.setFilter,
+        function($event, filter, value) {
+          updateStateParams($scope.state.params = osViewerService.params
+            .changeFilter($scope.state.params, filter, value,
+              $scope.state.package));
+        });
+
+      $scope.$on(Configuration.events.sidebar.clearFilter,
+        function($event, filter, value) {
+          updateStateParams($scope.state.params = osViewerService.params
+            .clearFilter($scope.state.params, filter, value,
+              $scope.state.package));
+        });
+    }
+  ]);

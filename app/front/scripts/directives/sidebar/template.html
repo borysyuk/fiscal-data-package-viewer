@@ -1,0 +1,27 @@
+<div ng-switch="type">
+  <sidebar-measures ng-if="!!type"
+    measures="datapackage.measures"
+    params="params"></sidebar-measures>
+
+  <drilldown-sidebar ng-switch-when="drilldown"
+    hierarchies="datapackage.hierarchies"
+    params="params"></drilldown-sidebar>
+
+  <sortable-series-sidebar ng-switch-when="sortable-series"
+    hierarchies="datapackage.hierarchies"
+    series-hierarchies="datapackage.seriesHierarchies"
+    params="params"></sortable-series-sidebar>
+
+  <time-series-sidebar ng-switch-when="time-series"
+    hierarchies="datapackage.hierarchies"
+    params="params"></time-series-sidebar>
+
+  <location-sidebar ng-switch-when="location"
+    hierarchies="datapackage.locationHierarchies"
+    params="params"></location-sidebar>
+
+  <pivot-table-sidebar ng-switch-when="pivot-table"
+    row-hierarchies="datapackage.hierarchies"
+    column-hierarchies="datapackage.columnHierarchies"
+    params="params"></pivot-table-sidebar>
+</div>

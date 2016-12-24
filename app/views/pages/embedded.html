@@ -1,130 +1,20 @@
 {% extends "layouts/embedded.html" %}
 
 {% block content %}
-<style>
-  .alert {
-    display: none;
-  !important;
-  }
-
-  .container {
-    padding: 0px;
-  !important;
-    margin: 0px;
-  !important;
-  }
-</style>
-
-<div>
-  {% if view == 'piechart' %}
-  {% raw %}
-  <pie-chart cube="{{cube}}" state="params" endpoint="{{apiUrl}}">
-  </pie-chart>
-  {% endraw %}
-  {% endif %}
-
-  {% if view == 'barchart' %}
-  {% raw %}
-  <chart cube="{{cube}}" type="bar" state="params" endpoint="{{apiUrl}}">
-  </chart>
-  {% endraw %}
-  {% endif %}
-
-  {% if view == 'linechart' %}
-  {% raw %}
-  <chart cube="{{cube}}" type="line" state="params" endpoint="{{apiUrl}}">
-  </chart>
-  {% endraw %}
-  {% endif %}
-
-  {% if view == 'treemap' %}
-  {% raw %}
-  <tree-map cube="{{cube}}" state="params" endpoint="{{apiUrl}}"></tree-map>
-  {% endraw %}
-  {% endif %}
-
-  {% if view == 'bubbletree' %}
-  {% raw %}
-  <bubbletree cube="{{cube}}" state="params" endpoint="{{apiUrl}}">
-  </bubbletree>
-  {% endraw %}
-  {% endif %}
-
-  {% if view == 'table' %}
-  {% raw %}
-  <babbage-table cube="{{cube}}" state="params" endpoint="{{apiUrl}}">
-  </babbage-table>
-  {% endraw %}
-  {% endif %}
-
-  {% if view == 'map' %}
-  {% raw %}
-  <geo-view
-    cube="{{cube}}"
-    state="params"
-    endpoint="{{apiUrl}}"
-    cosmo-endpoint="{{cosmoEndpoint}}"
-    country-code="{{countryCode}}">
-  </geo-view>
-  {% endraw %}
-  {% endif %}
-
-  {% if view == 'pivottable' %}
-  {% raw %}
-  <pivot-table
-    cube="{{cube}}"
-    state="paramsPivot"
-    endpoint="{{apiUrl}}"
-    cosmo-endpoint="{{cosmoEndpoint}}"
-    country-code="{{countryCode}}">
-  </pivot-table>
-  {% endraw %}
-  {% endif %}
+{% raw %}
+<div ng-if="!isLoading.application && !isLoading.package" ng-cloak>
+  <div ng-switch="state.params.visualizations[0]" class="row">
+    <treemap-visualization ng-switch-when="Treemap" params="state.params"></treemap-visualization>
+    <pie-chart-visualization ng-switch-when="PieChart" params="state.params"></pie-chart-visualization>
+    <bar-chart-visualization ng-switch-when="BarChart" params="state.params"></bar-chart-visualization>
+    <line-chart-visualization ng-switch-when="LineChart" params="state.params"></line-chart-visualization>
+    <table-visualization ng-switch-when="Table" params="state.params"></table-visualization>
+    <bubble-tree-visualization ng-switch-when="BubbleTree" params="state.params"></bubble-tree-visualization>
+    <map-visualization ng-switch-when="Map" params="state.params"></map-visualization>
+    <pivot-table-visualization ng-switch-when="PivotTable" params="state.params"></pivot-table-visualization>
+    <sankey-visualization ng-switch-when="Sankey" params="state.params"></sankey-visualization>
+    <radar-chart-visualization ng-switch-when="Radar" params="state.params"></radar-chart-visualization>
+  </div>
 </div>
-
-<script>
-  var components = require('components');
-
-  var pieDirective = new components.babbage.PieChartDirective();
-  var chartDirective = new components.babbage.ChartDirective();
-  var treemapDirective = new components.babbage.TreemapDirective();
-  var bubbleTreeDirective = new components.babbage.BubbleTreeDirective();
-  var tableDirective = new components.babbage.BabbageTableDirective();
-  var geoViewDirective = new components.babbage.GeoViewDirective();
-  var pivotTableDirective = new components.babbage.PivotTableDirective();
-
-  var embedded = angular.module('Application', []);
-
-  pieDirective.init(embedded);
-  chartDirective.init(embedded);
-  treemapDirective.init(embedded);
-  tableDirective.init(embedded);
-  bubbleTreeDirective.init(embedded);
-  geoViewDirective.init(embedded);
-  pivotTableDirective.init(embedded);
-
-  embedded.controller('EmbeddedCtrl', [
-    '$scope', '$q',
-    function($scope, $q) {
-      $scope.apiUrl = '{{apiUrl | safe}}';
-      $scope.cube = '{{cube | safe}}';
-      $scope.view = '{{view | safe}}';
-      $scope.params = {{params | safe }};
-      $scope.paramsPivot = {{paramsPivot | safe }};
-      $scope.cosmoEndpoint = '{{cosmoUrl | safe}}';
-
-      var api = components.dataPackageApi({url: $scope.apiUrl});
-      if ($scope.view == 'map') {
-        $q(function(resolve, reject) {
-          api.getDataPackage($scope.cube).then(resolve).catch(reject);
-        })
-        .then(function(packageInfo) {
-          $scope.countryCode = _.isArray(packageInfo.countryCode) ?
-            _.first(packageInfo.countryCode) : packageInfo.countryCode;
-        });
-      }
-    }
-  ]);
-</script>
-
+{% endraw %}
 {% endblock %}

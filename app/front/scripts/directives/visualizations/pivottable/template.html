@@ -1,0 +1,17 @@
+<div class="col-xs-12" ng-if="!params.isEmbedded">
+  <export-control
+    target-selector="#babbage-pivot-table"
+    file-name="{{ state.availablePackages.current }}"
+  ></export-control>
+</div>
+<div class="x-visualization-chart col-xs-12">
+  <pivot-table ng-if="isVisible" id="babbage-pivot-table"
+    downloader="downloader"
+    cube="{{ params.packageId }}"
+    state="state"
+    format-value="formatValue"
+    max-value-limit="1998"
+    max-value-message="{{ 'Too much data error message' | i18n }}"
+    endpoint="{{ params.babbageApiUrl }}">
+  </pivot-table>
+</div>

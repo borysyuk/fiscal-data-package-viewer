@@ -1,0 +1,12 @@
+<div class="col-xs-12">
+  <breadcrumbs breadcrumbs="params.breadcrumbs"></breadcrumbs>
+</div>
+<div class="x-visualization-chart col-xs-12">
+  <bubbletree ng-if="isVisible"
+    downloader="downloader"
+    cube="{{ params.packageId }}"
+    state="state"
+    format-value="formatValue"
+    endpoint="{{ params.babbageApiUrl }}">
+  </bubbletree>
+</div>

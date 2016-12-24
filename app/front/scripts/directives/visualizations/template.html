@@ -1,0 +1,10 @@
+ <visualization-container ng-repeat="visualization in selectedVisualizations"
+  visualization="visualization" params="params"></visualization-container>
+
+<visualization-add-modal items="availableVisualizations" selected="selectedVisualizations"></visualization-add-modal>
+
+<div class="well x-visualization-container x-fixed-visualization">
+  <facts-visualization params="params"></facts-visualization>
+</div>
+
+<visualization-share-modal params="params"></visualization-share-modal>

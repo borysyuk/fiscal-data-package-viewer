@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8"/>
-  <base href="/{{basePath}}"/>
+  <base href="{{basePath}}/">
   <meta http-equiv="x-ua-compatible" content="ie=edge"/>
   <meta name="description" content="A frontend data/views app powered directly from a Fiscal Data Package."/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -12,12 +12,21 @@
   <link rel="stylesheet" href="styles/vendor.css?{{ sessionSalt }}">
   <link rel="stylesheet" href="styles/app.css?{{ sessionSalt }}">
   <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+  <style>
+    .x-page-container .x-sidebar, .navbar-inverse,
+    .list-group.list-group-inverse .list-group-item { background: {{ theme.colors.sidebar }} !important; }
+    .x-page-container .x-content { background: {{ theme.colors.content }} !important; }
+    .navbar-brand.navbar-brand-primary { box-shadow: inset 50px 0 0 {{ theme.colors.brand }} !important; }
+  </style>
+
+  {% include "../partials/snippets.html" %}
 </head>
-<body ng-app="Application" ng-controller="main" class="ng-cloak">
+<body ng-controller="MainController"
+      ng-init='isEmbedded=false; disablePackageSelector={{ 'true' if isEmbedded else 'false' }}; theme={{ theme | stringify }}'>
 <div id="root"></div>
 
 {% if not isEmbedded %}
-  {% include "partials/header.html" %}
+{% include "partials/header.html" %}
 {% endif %}
 
 <div class="x-page-container">
@@ -30,19 +39,11 @@
 </div>
 
 {% if not isEmbedded %}
-  {% include "partials/footer.html" %}
+{% include "partials/footer.html" %}
 {% endif %}
 
-<script src="modules.js?{{ sessionSalt }}"></script>
-<script src="vendor.js?{{ sessionSalt }}"></script>
-<script src="{{ authLibraryUrl }}"></script>
 <script src="app.js?{{ sessionSalt }}"></script>
-
-{% block footerScript %}{% endblock %}
-
-<script>
-  window.isEmbedded = {{isEmbedded}}
-</script>
+<script src="{{ authLibraryUrl }}"></script>
 
 </body>
 </html>

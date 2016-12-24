@@ -1,42 +1,34 @@
 'use strict';
 
-var paramParser = require('../front/scripts/components/url-param-parser');
+var _ = require('lodash');
+var i18n = require('../config/i18n');
+var theme = require('../config/theming');
+
+function getBasePath(config) {
+  var result = config.get('basePath');
+  if (_.isUndefined(result) || _.isNull(result) || (result == '')) {
+    return '';
+  }
+  result = '' + result;
+  if (result.substr(0, 1) != '/') {
+    result = '/' + result;
+  }
+  if (result.substr(-1, 1) == '/') {
+    result = result.substr(0, result.length - 1);
+  }
+  return result;
+}
 
 module.exports.main = function(req, res) {
   var config = req.app.get('config');
-  req.isEmbedded = req.isEmbedded || false;
 
-  res.render('pages/main.html', {
-    title: 'Open Spending Viewer',
-    basePath: config.get('basePath'),
-    isEmbedded: req.isEmbedded
-  });
-};
+  var viewFileName = 'pages/' +  (req.view || 'main') + '.html';
+  var _t = i18n.init(req.query.lang);
 
-module.exports.embedded = function(req, res) {
-  var config = req.app.get('config');
-  req.isEmbedded = req.isEmbedded || false;
-  req.cube = req.cube || '';
-  req.view = req.view || 'treemap';
-
-  var params = paramParser.parse(req.query);
-
-  res.render('pages/embedded.html', {
-    basePath: config.get('basePath'),
-    cube: req.cube,
-    view: req.view,
-    apiUrl: config.get('api').url,
-    cosmoUrl: config.get('api').cosmoUrl,
-    params: JSON.stringify({
-      aggregates: params.measure,
-      group: params.groups,
-      filters: params.filters
-    }),
-    paramsPivot: JSON.stringify({
-      aggregates: params.measure,
-      rows: params.rows,
-      cols: params.columns,
-      filters: params.filters
-    })
+  res.render(viewFileName, {
+    title: _t('Open Spending Viewer'),
+    basePath: getBasePath(config),
+    isEmbedded: req.isEmbedded,
+    theme: theme.get(req.query.theme)
   });
 };
